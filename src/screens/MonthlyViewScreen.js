@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { loadEvents } from '../utils/storage';
 import dayjs from 'dayjs';
 
@@ -8,33 +9,37 @@ const MonthlyViewScreen = ({ navigation }) => {
   const [currentMonth, setCurrentMonth] = useState(dayjs());
   const [todayEvents, setTodayEvents] = useState([]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const stored = await loadEvents();
-      setEvents(stored);
-      const todayString = dayjs().format('YYYY-MM-DD');
-      setTodayEvents(stored.filter(e => e.date === todayString));
-    };
-    fetchData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      const fetchData = async () => {
+        const stored = await loadEvents();
+        setEvents(stored);
+        const todayString = dayjs().format('YYYY-MM-DD');
+        setTodayEvents(stored.filter(e => e.date === todayString));
+      };
+      fetchData();
+    }, [])
+  );
 
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity onPress={() => navigation.navigate('AddEvent')}>
-          <Text style={{ marginRight: 10, fontSize: 18, color: 'blue' }}>＋</Text>
-        </TouchableOpacity>
-      )
-    });
-  }, [navigation]);
+  useFocusEffect(
+    useCallback(() => {
+      navigation.setOptions({
+        headerRight: () => (
+          <TouchableOpacity onPress={() => navigation.navigate('AddEvent')}>
+            <Text style={{ marginRight: 10, fontSize: 18, color: 'blue' }}>＋</Text>
+          </TouchableOpacity>
+        )
+      });
+    }, [navigation])
+  );
 
   const generateDaysInMonth = () => {
     const start = currentMonth.startOf('month').startOf('week');
     const end = currentMonth.endOf('month').endOf('week');
     const days = [];
-    let day = start;
 
-    while (day.isBefore(end) || day.isSame(end)) {
+    let day = start;
+    while (day.isBefore(end)) {
       days.push(day);
       day = day.add(1, 'day');
     }
@@ -52,7 +57,7 @@ const MonthlyViewScreen = ({ navigation }) => {
         style={[
           styles.dayCell,
           dayString === dayjs().format('YYYY-MM-DD') && styles.todayCell
-        ]}
+        ]} 
         onPress={() => navigation.navigate('DayView', { selectedDate: dayString })}
       >
         <Text style={styles.dayText}>{day.date()}</Text>
@@ -68,25 +73,29 @@ const MonthlyViewScreen = ({ navigation }) => {
       style={styles.eventItem}
       onPress={() => navigation.navigate('EventDetail', { eventId: item.id })}
     >
-      <Text style={styles.eventTime}>{item.time}</Text>
+      <Text style={styles.eventTime}>{item.time || ''}</Text>
       <Text style={styles.eventTitle}>{item.title}</Text>
     </TouchableOpacity>
   );
 
+  const handleMonthChange = (direction) => {
+    setCurrentMonth(prev =>
+      direction === 'prev' ? prev.subtract(1, 'month') : prev.add(1, 'month')
+    );
+  };
+
   return (
     <View style={styles.container}>
-      {/* Month Navigation Header */}
-      <View style={styles.monthHeader}>
-        <TouchableOpacity onPress={() => setCurrentMonth(prev => prev.subtract(1, 'month'))}>
-          <Text style={styles.arrow}>‹</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => handleMonthChange('prev')}>
+          <Text style={styles.navArrow}>{'<'}</Text>
         </TouchableOpacity>
         <Text style={styles.monthText}>{currentMonth.format('MMMM YYYY')}</Text>
-        <TouchableOpacity onPress={() => setCurrentMonth(prev => prev.add(1, 'month'))}>
-          <Text style={styles.arrow}>›</Text>
+        <TouchableOpacity onPress={() => handleMonthChange('next')}>
+          <Text style={styles.navArrow}>{'>'}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Calendar Grid */}
       <View style={styles.grid}>
         {days.map((day, index) => (
           <View key={index} style={styles.dayWrapper}>
@@ -95,14 +104,13 @@ const MonthlyViewScreen = ({ navigation }) => {
         ))}
       </View>
 
-      {/* Today's Events */}
       <View style={styles.todaySection}>
         <Text style={styles.sectionTitle}>Today's Events</Text>
         {todayEvents.length > 0 ? (
           <FlatList
             data={todayEvents}
             renderItem={renderTodayEvent}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.id.toString()}
           />
         ) : (
           <Text style={styles.noEventsText}>No events for today</Text>
@@ -113,26 +121,22 @@ const MonthlyViewScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    padding: 10,
-    flex: 1 
+  container: { padding: 10, flex: 1 },
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 10 
   },
-  monthHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10
-  },
-  arrow: {
-    fontSize: 26,
-    color: 'blue',
-    paddingHorizontal: 15
+  navArrow: {
+    fontSize: 24,
+    paddingHorizontal: 10,
+    color: 'blue'
   },
   monthText: { 
     fontSize: 22, 
     fontWeight: 'bold', 
-    textAlign: 'center', 
-    flex: 1
+    textAlign: 'center' 
   },
   grid: { 
     flexDirection: 'row', 
@@ -153,8 +157,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     width: 30,
     height: 30,
-    justifyContent: 'center',
-    alignItems: 'center'
+    justifyContent: 'center'
   },
   dayText: { 
     fontSize: 16 
