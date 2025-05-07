@@ -5,6 +5,8 @@ import { storeEvents, loadEvents } from '../utils/storage';
 
 const AddEventScreen = ({ navigation }) => {
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [notes, setNotes] = useState('');
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -12,13 +14,15 @@ const AddEventScreen = ({ navigation }) => {
     const newEvent = {
       id: Date.now(),
       title,
-      date: date.toISOString().split('T')[0], // YYYY-MM-DD
+      description,
+      notes,
+      date: date.toISOString().split('T')[0], // Store as 'YYYY-MM-DD'
     };
 
     const existing = await loadEvents();
     const updated = [...existing, newEvent];
     await storeEvents(updated);
-    navigation.goBack(); // Refresh handled in MonthlyViewScreen
+    navigation.goBack(); // Return to calendar view
   };
 
   return (
@@ -29,6 +33,22 @@ const AddEventScreen = ({ navigation }) => {
         value={title}
         onChangeText={setTitle}
         placeholder="e.g. Doctor Appointment"
+      />
+
+      <Text style={styles.label}>Description</Text>
+      <TextInput
+        style={styles.input}
+        value={description}
+        onChangeText={setDescription}
+        placeholder="e.g. Appointment with Dr. Smith"
+      />
+
+      <Text style={styles.label}>Notes</Text>
+      <TextInput
+        style={styles.input}
+        value={notes}
+        onChangeText={setNotes}
+        placeholder="e.g. Bring medical history"
       />
 
       <Text style={styles.label}>Event Date</Text>

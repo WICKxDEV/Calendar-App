@@ -1,37 +1,32 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { loadEvents } from '../utils/storage';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { loadEvents, saveEvent } from '../utils/storage';
 import dayjs from 'dayjs';
+import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler'; // For swipe gestures
+import { useNavigation } from '@react-navigation/native';
 
-const MonthlyViewScreen = ({ navigation }) => {
+const MonthlyViewScreen = () => {
   const [events, setEvents] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(dayjs());
   const [todayEvents, setTodayEvents] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredEvents, setFilteredEvents] = useState([]);
+  const navigation = useNavigation();
 
-  useFocusEffect(
-    useCallback(() => {
-      const fetchData = async () => {
-        const stored = await loadEvents();
-        setEvents(stored);
-        const todayString = dayjs().format('YYYY-MM-DD');
-        setTodayEvents(stored.filter(e => e.date === todayString));
-      };
-      fetchData();
-    }, [])
-  );
+  useEffect(() => {
+    const fetchData = async () => {
+      const stored = await loadEvents();
+      setEvents(stored);
+      // Filter today's events
+      const todayString = dayjs().format('YYYY-MM-DD');
+      setTodayEvents(stored.filter(e => e.date === todayString));
+    };
+    fetchData();
+  }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      navigation.setOptions({
-        headerRight: () => (
-          <TouchableOpacity onPress={() => navigation.navigate('AddEvent')}>
-            <Text style={{ marginRight: 10, fontSize: 18, color: 'blue' }}>＋</Text>
-          </TouchableOpacity>
-        )
-      });
-    }, [navigation])
-  );
+  useEffect(() => {
+    setFilteredEvents(events.filter(e => e.title.toLowerCase().includes(searchQuery.toLowerCase())));
+  }, [searchQuery, events]);
 
   const generateDaysInMonth = () => {
     const start = currentMonth.startOf('month').startOf('week');
@@ -48,16 +43,24 @@ const MonthlyViewScreen = ({ navigation }) => {
 
   const days = generateDaysInMonth();
 
+  const handleSwipe = (direction) => {
+    if (direction === 'left') {
+      setCurrentMonth(currentMonth.add(1, 'month'));
+    } else if (direction === 'right') {
+      setCurrentMonth(currentMonth.subtract(1, 'month'));
+    }
+  };
+
   const renderDay = (day) => {
     const dayString = day.format('YYYY-MM-DD');
-    const dayEvents = events.filter(e => e.date === dayString);
+    const dayEvents = filteredEvents.filter(e => e.date === dayString);
 
     return (
       <TouchableOpacity 
         style={[
           styles.dayCell,
-          dayString === dayjs().format('YYYY-MM-DD') && styles.todayCell
-        ]} 
+          day.format('YYYY-MM-DD') === dayjs().format('YYYY-MM-DD') && styles.todayCell
+        ]}
         onPress={() => navigation.navigate('DayView', { selectedDate: dayString })}
       >
         <Text style={styles.dayText}>{day.date()}</Text>
@@ -69,74 +72,105 @@ const MonthlyViewScreen = ({ navigation }) => {
   };
 
   const renderTodayEvent = ({ item }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.eventItem}
       onPress={() => navigation.navigate('EventDetail', { eventId: item.id })}
     >
-      <Text style={styles.eventTime}>{item.time || ''}</Text>
+      <Text style={styles.eventTime}>{item.time}</Text>
       <Text style={styles.eventTitle}>{item.title}</Text>
     </TouchableOpacity>
   );
 
-  const handleMonthChange = (direction) => {
-    setCurrentMonth(prev =>
-      direction === 'prev' ? prev.subtract(1, 'month') : prev.add(1, 'month')
-    );
+  const handleAddEvent = () => {
+    // Implement logic to add event, like showing a modal or navigating to another screen
+    navigation.navigate('AddEvent');
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => handleMonthChange('prev')}>
-          <Text style={styles.navArrow}>{'<'}</Text>
-        </TouchableOpacity>
-        <Text style={styles.monthText}>{currentMonth.format('MMMM YYYY')}</Text>
-        <TouchableOpacity onPress={() => handleMonthChange('next')}>
-          <Text style={styles.navArrow}>{'>'}</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.grid}>
-        {days.map((day, index) => (
-          <View key={index} style={styles.dayWrapper}>
-            {renderDay(day)}
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.todaySection}>
-        <Text style={styles.sectionTitle}>Today's Events</Text>
-        {todayEvents.length > 0 ? (
-          <FlatList
-            data={todayEvents}
-            renderItem={renderTodayEvent}
-            keyExtractor={(item) => item.id.toString()}
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+        <View style={styles.container}>
+          <PanGestureHandler onGestureEvent={({ nativeEvent }) => {
+            if (nativeEvent.translationX < -100) handleSwipe('left');  // Swipe left
+            else if (nativeEvent.translationX > 100) handleSwipe('right');  // Swipe right
+          }}>
+            <View style={styles.monthHeader}>
+              <Text style={styles.monthText}>{currentMonth.format('MMMM YYYY')}</Text>
+              <TouchableOpacity onPress={handleAddEvent} style={styles.addButton}>
+                <Text style={styles.addButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </PanGestureHandler>
+          
+          <TextInput 
+            style={styles.searchInput}
+            placeholder="Search events..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
-        ) : (
-          <Text style={styles.noEventsText}>No events for today</Text>
-        )}
-      </View>
-    </View>
+
+          <View style={styles.grid}>
+            {days.map((day, index) => (
+              <View key={index} style={styles.dayWrapper}>
+                {renderDay(day)}
+              </View>
+            ))}
+          </View>
+
+          {/* Today's Events Section */}
+          <View style={styles.todaySection}>
+            <Text style={styles.sectionTitle}>Today's Events</Text>
+            {todayEvents.length > 0 ? (
+              <FlatList
+                data={todayEvents}
+                renderItem={renderTodayEvent}
+                keyExtractor={(item) => item.id}
+              />
+            ) : (
+              <Text style={styles.noEventsText}>No events for today</Text>
+            )}
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
+    </GestureHandlerRootView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { padding: 10, flex: 1 },
-  header: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: 10 
+  container: { 
+    padding: 10,
+    flex: 1 
   },
-  navArrow: {
-    fontSize: 24,
-    paddingHorizontal: 10,
-    color: 'blue'
+  monthHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   monthText: { 
     fontSize: 22, 
     fontWeight: 'bold', 
-    textAlign: 'center' 
+    textAlign: 'center', 
+  },
+  addButton: {
+    backgroundColor: '#007bff',
+    padding: 10,
+    borderRadius: 30,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 24,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    marginBottom: 15,
+    borderRadius: 5,
+    fontSize: 16,
   },
   grid: { 
     flexDirection: 'row', 
