@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, TouchableWithoutFeedback, Keyboard } from 'react-native';
-import { loadEvents, saveEvent } from '../utils/storage';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, TouchableWithoutFeedback, Keyboard, Modal } from 'react-native';
+import { loadEvents } from '../utils/storage';
 import dayjs from 'dayjs';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
@@ -14,6 +14,8 @@ const MonthlyViewScreen = () => {
   const [filteredEvents, setFilteredEvents] = useState([]);
   const [displayedSearchQuery, setDisplayedSearchQuery] = useState('');
   const [displayedFilteredEvents, setDisplayedFilteredEvents] = useState([]);
+  const [showMonthYearPicker, setShowMonthYearPicker] = useState(false);
+  const [tempSelectedMonth, setTempSelectedMonth] = useState(dayjs());
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -71,21 +73,40 @@ const MonthlyViewScreen = () => {
     }
   };
 
+  const changeMonth = (monthOffset) => {
+    setCurrentMonth(currentMonth.add(monthOffset, 'month'));
+  };
+
+  const openMonthYearPicker = () => {
+    setTempSelectedMonth(currentMonth);
+    setShowMonthYearPicker(true);
+  };
+
+  const confirmMonthYearSelection = () => {
+    setCurrentMonth(tempSelectedMonth);
+    setShowMonthYearPicker(false);
+  };
+
   const renderDay = (day) => {
     const dayString = day.format('YYYY-MM-DD');
     const dayEvents = displayedSearchQuery ? 
       displayedFilteredEvents.filter(e => e.date === dayString) : 
       events.filter(e => e.date === dayString);
 
+    const isCurrentMonth = day.month() === currentMonth.month();
+    const dayTextStyle = isCurrentMonth ? styles.dayText : styles.dayTextOtherMonth;
+    const dayCellStyle = [
+      styles.dayCell,
+      day.format('YYYY-MM-DD') === dayjs().format('YYYY-MM-DD') && styles.todayCell,
+      !isCurrentMonth && styles.dayCellOtherMonth
+    ];
+
     return (
       <TouchableOpacity 
-        style={[
-          styles.dayCell,
-          day.format('YYYY-MM-DD') === dayjs().format('YYYY-MM-DD') && styles.todayCell
-        ]}
+        style={dayCellStyle}
         onPress={() => navigation.navigate('DayView', { selectedDate: dayString })}
       >
-        <Text style={styles.dayText}>{day.date()}</Text>
+        <Text style={dayTextStyle}>{day.date()}</Text>
         {dayEvents.length > 0 && (
           <Text style={styles.eventDot}>• {dayEvents.length}</Text>
         )}
@@ -114,8 +135,77 @@ const MonthlyViewScreen = () => {
     </TouchableOpacity>
   );
 
-  const handleAddEvent = () => {
-    navigation.navigate('AddEvent');
+  const renderMonthYearPicker = () => {
+    const months = Array.from({ length: 12 }, (_, i) => dayjs().month(i).format('MMMM'));
+    const currentYear = tempSelectedMonth.year();
+    const years = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
+
+    return (
+      <Modal
+        transparent={true}
+        visible={showMonthYearPicker}
+        animationType="slide"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.monthYearPicker}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>Select Month and Year</Text>
+            </View>
+            
+            <View style={styles.pickerContainer}>
+              <View style={styles.monthPicker}>
+                {months.map((month, index) => (
+                  <TouchableOpacity
+                    key={month}
+                    style={[
+                      styles.monthYearItem,
+                      tempSelectedMonth.month() === index && styles.selectedMonthYearItem
+                    ]}
+                    onPress={() => setTempSelectedMonth(tempSelectedMonth.month(index))}
+                  >
+                    <Text style={tempSelectedMonth.month() === index ? styles.selectedMonthYearText : styles.monthYearText}>
+                      {month}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              <View style={styles.yearPicker}>
+                {years.map(year => (
+                  <TouchableOpacity
+                    key={year}
+                    style={[
+                      styles.monthYearItem,
+                      tempSelectedMonth.year() === year && styles.selectedMonthYearItem
+                    ]}
+                    onPress={() => setTempSelectedMonth(tempSelectedMonth.year(year))}
+                  >
+                    <Text style={tempSelectedMonth.year() === year ? styles.selectedMonthYearText : styles.monthYearText}>
+                      {year}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            
+            <View style={styles.pickerButtons}>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={() => setShowMonthYearPicker(false)}
+              >
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.confirmButton}
+                onPress={confirmMonthYearSelection}
+              >
+                <Text style={styles.buttonText}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
   };
 
   return (
@@ -127,9 +217,16 @@ const MonthlyViewScreen = () => {
             else if (nativeEvent.translationX > 100) handleSwipe('right');
           }}>
             <View style={styles.monthHeader}>
-              <Text style={styles.monthText}>{currentMonth.format('MMMM YYYY')}</Text>
-              <TouchableOpacity onPress={handleAddEvent} style={styles.addButton}>
-                <Text style={styles.addButtonText}>+</Text>
+              <TouchableOpacity onPress={() => changeMonth(-1)}>
+                <Text style={styles.navArrow}>{'<'}</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity onPress={openMonthYearPicker}>
+                <Text style={styles.monthText}>{currentMonth.format('MMMM YYYY')}</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity onPress={() => changeMonth(1)}>
+                <Text style={styles.navArrow}>{'>'}</Text>
               </TouchableOpacity>
             </View>
           </PanGestureHandler>
@@ -140,6 +237,12 @@ const MonthlyViewScreen = () => {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+
+          <View style={styles.weekDaysHeader}>
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+              <Text key={day} style={styles.weekDayText}>{day}</Text>
+            ))}
+          </View>
 
           {displayedSearchQuery ? (
             <View style={styles.searchResultsContainer}>
@@ -167,6 +270,16 @@ const MonthlyViewScreen = () => {
                 ))}
               </View>
 
+              {/* Month's Events Summary */}
+              <View style={styles.monthEventsSummary}>
+                <Text style={styles.sectionTitle}>
+                  Events in {currentMonth.format('MMMM YYYY')}:{' '}
+                  <Text style={styles.eventsCount}>
+                    {events.filter(e => dayjs(e.date).isSame(currentMonth, 'month')).length}
+                  </Text>
+                </Text>
+              </View>
+
               {/* Today's Events Section */}
               <View style={styles.todaySection}>
                 <Text style={styles.sectionTitle}>Today's Events</Text>
@@ -182,6 +295,8 @@ const MonthlyViewScreen = () => {
               </View>
             </>
           )}
+
+          {renderMonthYearPicker()}
         </View>
       </TouchableWithoutFeedback>
     </GestureHandlerRootView>
@@ -197,24 +312,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 15,
+  },
+  navArrow: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    paddingHorizontal: 15,
+    color: '#007bff',
   },
   monthText: { 
     fontSize: 22, 
     fontWeight: 'bold', 
-    textAlign: 'center', 
-  },
-  addButton: {
-    backgroundColor: '#007bff',
-    padding: 10,
-    borderRadius: 30,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 24,
+    textAlign: 'center',
+    color: '#007bff',
   },
   searchInput: {
     borderWidth: 1,
@@ -223,6 +333,18 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 5,
     fontSize: 16,
+  },
+  weekDaysHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 10,
+  },
+  weekDayText: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    color: '#666',
+    width: '14.2%',
+    textAlign: 'center',
   },
   grid: { 
     flexDirection: 'row', 
@@ -236,21 +358,38 @@ const styles = StyleSheet.create({
   },
   dayCell: { 
     alignItems: 'center', 
-    padding: 5 
+    padding: 5,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+  },
+  dayCellOtherMonth: {
+    opacity: 0.4,
   },
   todayCell: {
     backgroundColor: '#e6f7ff',
-    borderRadius: 20,
-    width: 30,
-    height: 30,
+    borderRadius: 18,
+    width: 36,
+    height: 36,
     justifyContent: 'center'
   },
   dayText: { 
     fontSize: 16 
   },
+  dayTextOtherMonth: {
+    fontSize: 16,
+    color: '#999',
+  },
   eventDot: { 
     fontSize: 12, 
-    color: 'blue' 
+    color: 'blue',
+    position: 'absolute',
+    bottom: -2,
+  },
+  monthEventsSummary: {
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
   },
   todaySection: {
     borderTopWidth: 1,
@@ -262,6 +401,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10
+  },
+  eventsCount: {
+    color: '#007bff',
   },
   eventItem: {
     flexDirection: 'row',
@@ -317,7 +459,82 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
     fontSize: 16
-  }
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  monthYearPicker: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    width: '90%',
+    maxWidth: 400,
+    padding: 20,
+  },
+  pickerHeader: {
+    marginBottom: 15,
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  pickerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  monthPicker: {
+    flex: 1,
+    marginRight: 10,
+  },
+  yearPicker: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  monthYearItem: {
+    padding: 10,
+    marginVertical: 2,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  selectedMonthYearItem: {
+    backgroundColor: '#007bff',
+  },
+  monthYearText: {
+    fontSize: 16,
+  },
+  selectedMonthYearText: {
+    fontSize: 16,
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  pickerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  cancelButton: {
+    backgroundColor: '#e0e0e0',
+    padding: 10,
+    borderRadius: 5,
+    flex: 1,
+    marginRight: 10,
+    alignItems: 'center',
+  },
+  confirmButton: {
+    backgroundColor: '#007bff',
+    padding: 10,
+    borderRadius: 5,
+    flex: 1,
+    marginLeft: 10,
+    alignItems: 'center',
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });
 
 export default MonthlyViewScreen;
