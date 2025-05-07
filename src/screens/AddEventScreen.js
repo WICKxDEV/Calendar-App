@@ -12,13 +12,13 @@ const AddEventScreen = ({ navigation }) => {
     const newEvent = {
       id: Date.now(),
       title,
-      date: date.toISOString().split('T')[0], // store as 'YYYY-MM-DD'
+      date: date.toISOString().split('T')[0], // Store as 'YYYY-MM-DD'
     };
 
     const existing = await loadEvents();
     const updated = [...existing, newEvent];
     await storeEvents(updated);
-    navigation.goBack(); // return to calendar view
+    navigation.goBack(); // Return to calendar view
   };
 
   return (

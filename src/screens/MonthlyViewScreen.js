@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { loadEvents } from '../utils/storage';
 import dayjs from 'dayjs';
 
@@ -41,9 +41,11 @@ const MonthlyViewScreen = ({ navigation }) => {
   const days = generateDaysInMonth();
 
   const renderDay = (day) => {
-    const dayEvents = events.filter(e => e.date === day.format('YYYY-MM-DD'));
+    const dayString = day.format('YYYY-MM-DD');
+    const dayEvents = events.filter(e => e.date === dayString);
+  
     return (
-      <TouchableOpacity style={styles.dayCell}>
+      <TouchableOpacity style={styles.dayCell} onPress={() => navigation.navigate('DayView', { selectedDate: dayString })}>
         <Text style={styles.dayText}>{day.date()}</Text>
         {dayEvents.length > 0 && (
           <Text style={styles.eventDot}>• {dayEvents.length}</Text>
