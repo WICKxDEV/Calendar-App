@@ -12,7 +12,6 @@ const MonthlyViewScreen = ({ navigation }) => {
     const fetchData = async () => {
       const stored = await loadEvents();
       setEvents(stored);
-      // Filter today's events
       const todayString = dayjs().format('YYYY-MM-DD');
       setTodayEvents(stored.filter(e => e.date === todayString));
     };
@@ -33,9 +32,9 @@ const MonthlyViewScreen = ({ navigation }) => {
     const start = currentMonth.startOf('month').startOf('week');
     const end = currentMonth.endOf('month').endOf('week');
     const days = [];
-
     let day = start;
-    while (day.isBefore(end)) {
+
+    while (day.isBefore(end) || day.isSame(end)) {
       days.push(day);
       day = day.add(1, 'day');
     }
@@ -47,13 +46,13 @@ const MonthlyViewScreen = ({ navigation }) => {
   const renderDay = (day) => {
     const dayString = day.format('YYYY-MM-DD');
     const dayEvents = events.filter(e => e.date === dayString);
-  
+
     return (
       <TouchableOpacity 
         style={[
           styles.dayCell,
-          day.format('YYYY-MM-DD') === dayjs().format('YYYY-MM-DD') && styles.todayCell
-        ]} 
+          dayString === dayjs().format('YYYY-MM-DD') && styles.todayCell
+        ]}
         onPress={() => navigation.navigate('DayView', { selectedDate: dayString })}
       >
         <Text style={styles.dayText}>{day.date()}</Text>
@@ -76,7 +75,18 @@ const MonthlyViewScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.monthText}>{currentMonth.format('MMMM YYYY')}</Text>
+      {/* Month Navigation Header */}
+      <View style={styles.monthHeader}>
+        <TouchableOpacity onPress={() => setCurrentMonth(prev => prev.subtract(1, 'month'))}>
+          <Text style={styles.arrow}>‹</Text>
+        </TouchableOpacity>
+        <Text style={styles.monthText}>{currentMonth.format('MMMM YYYY')}</Text>
+        <TouchableOpacity onPress={() => setCurrentMonth(prev => prev.add(1, 'month'))}>
+          <Text style={styles.arrow}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Calendar Grid */}
       <View style={styles.grid}>
         {days.map((day, index) => (
           <View key={index} style={styles.dayWrapper}>
@@ -84,8 +94,8 @@ const MonthlyViewScreen = ({ navigation }) => {
           </View>
         ))}
       </View>
-      
-      {/* Today's Events Section */}
+
+      {/* Today's Events */}
       <View style={styles.todaySection}>
         <Text style={styles.sectionTitle}>Today's Events</Text>
         {todayEvents.length > 0 ? (
@@ -107,11 +117,22 @@ const styles = StyleSheet.create({
     padding: 10,
     flex: 1 
   },
+  monthHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10
+  },
+  arrow: {
+    fontSize: 26,
+    color: 'blue',
+    paddingHorizontal: 15
+  },
   monthText: { 
     fontSize: 22, 
     fontWeight: 'bold', 
     textAlign: 'center', 
-    marginBottom: 10 
+    flex: 1
   },
   grid: { 
     flexDirection: 'row', 
@@ -132,7 +153,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     width: 30,
     height: 30,
-    justifyContent: 'center'
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   dayText: { 
     fontSize: 16 
