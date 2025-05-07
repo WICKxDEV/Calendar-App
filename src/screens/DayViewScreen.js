@@ -1,64 +1,198 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { loadEvents, storeEvents } from '../utils/storage';
+import dayjs from 'dayjs';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const DayViewScreen = ({ route, navigation }) => {
   const { selectedDate } = route.params;
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      const stored = await loadEvents();
-      const filteredEvents = stored.filter(event => event.date === selectedDate);
-      setEvents(filteredEvents);
-    };
-    fetchData();
-  }, [selectedDate]);
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchEvents();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const fetchEvents = async () => {
+    const stored = await loadEvents();
+    const filteredEvents = stored.filter(event => event.date === selectedDate);
+    setEvents(filteredEvents);
+  };
+
+  const confirmDelete = (eventId) => {
+    Alert.alert(
+      'Delete Event',
+      'Are you sure you want to delete this event?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', onPress: () => handleDelete(eventId), style: 'destructive' }
+      ]
+    );
+  };
 
   const handleDelete = async (eventId) => {
-    const stored = await loadEvents();
-    const updatedEvents = stored.filter(event => event.id !== eventId);
-    await storeEvents(updatedEvents);
-    setEvents(updatedEvents);
+    try {
+      const stored = await loadEvents();
+      const updatedEvents = stored.filter(event => event.id !== eventId);
+      await storeEvents(updatedEvents);
+      setEvents(updatedEvents.filter(event => event.date === selectedDate));
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      Alert.alert('Error', 'Failed to delete event');
+    }
   };
 
   const handleEdit = (event) => {
     navigation.navigate('EditEvent', { event });
   };
 
+  const renderRightActions = (event) => {
+    return (
+      <View style={styles.swipeActions}>
+        <TouchableOpacity 
+          style={[styles.swipeButton, styles.editButton]} 
+          onPress={() => handleEdit(event)}
+        >
+          <Text style={styles.swipeButtonText}>Edit</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.swipeButton, styles.deleteButton]} 
+          onPress={() => confirmDelete(event.id)}
+        >
+          <Text style={styles.swipeButtonText}>Delete</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   const renderEvent = ({ item }) => (
-    <View style={styles.eventItem}>
-      <Text style={styles.eventTitle}>{item.title}</Text>
-      <Text style={styles.eventDate}>{item.date}</Text>
-      <TouchableOpacity onPress={() => handleEdit(item)}>
-        <Text style={styles.editButton}>Edit</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => handleDelete(item.id)}>
-        <Text style={styles.deleteButton}>Delete</Text>
-      </TouchableOpacity>
-    </View>
+    <Swipeable renderRightActions={() => renderRightActions(item)}>
+      <View style={styles.eventItem}>
+        <View style={styles.eventContent}>
+          <Text style={styles.eventTime}>{item.time || 'All day'}</Text>
+          <Text style={styles.eventTitle}>{item.title}</Text>
+          {item.description && <Text style={styles.eventDescription}>{item.description}</Text>}
+        </View>
+      </View>
+    </Swipeable>
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>{selectedDate}</Text>
-      <FlatList
-        data={events}
-        renderItem={renderEvent}
-        keyExtractor={(item) => item.id.toString()}
-      />
-    </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <Text style={styles.header}>{dayjs(selectedDate).format('dddd, MMMM D, YYYY')}</Text>
+        
+        {events.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No events scheduled for this day</Text>
+            <TouchableOpacity 
+              style={styles.addButton}
+              onPress={() => navigation.navigate('AddEvent', { initialDate: selectedDate })}
+            >
+              <Text style={styles.addButtonText}>Add Event</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            data={events}
+            renderItem={renderEvent}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContainer}
+          />
+        )}
+      </View>
+    </GestureHandlerRootView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { padding: 20 },
-  header: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 10 },
-  eventItem: { marginBottom: 15, padding: 10, backgroundColor: '#f0f0f0', borderRadius: 5 },
-  eventTitle: { fontSize: 18, fontWeight: 'bold' },
-  eventDate: { fontSize: 14, color: 'gray' },
-  editButton: { color: 'blue', marginTop: 5 },
-  deleteButton: { color: 'red', marginTop: 5 },
+  container: {
+    flex: 1,
+    padding: 16,
+    backgroundColor: '#fff',
+  },
+  header: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#333',
+    textAlign: 'center',
+  },
+  listContainer: {
+    paddingBottom: 20,
+  },
+  eventItem: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  eventContent: {
+    padding: 16,
+  },
+  eventTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#333',
+  },
+  eventTime: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  eventDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  swipeActions: {
+    flexDirection: 'row',
+    width: 160,
+    height: '100%',
+  },
+  swipeButton: {
+    width: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editButton: {
+    backgroundColor: '#4a90e2',
+  },
+  deleteButton: {
+    backgroundColor: '#e74c3c',
+  },
+  swipeButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#999',
+    marginBottom: 20,
+  },
+  addButton: {
+    backgroundColor: '#4a90e2',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 6,
+  },
+  addButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
 });
 
 export default DayViewScreen;
