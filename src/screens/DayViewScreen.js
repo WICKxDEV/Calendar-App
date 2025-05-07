@@ -1,14 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  TouchableOpacity, 
+  Alert,
+  SafeAreaView,
+  StatusBar
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { loadEvents, storeEvents } from '../utils/storage';
 import dayjs from 'dayjs';
-import Swipeable from 'react-native-gesture-handler/Swipeable';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { FontAwesome } from '@expo/vector-icons'; // Importing FontAwesome icons
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 
 const DayViewScreen = ({ route, navigation }) => {
   const { selectedDate } = route.params;
   const [events, setEvents] = useState([]);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -20,7 +30,7 @@ const DayViewScreen = ({ route, navigation }) => {
   const fetchEvents = async () => {
     const stored = await loadEvents();
     const filteredEvents = stored.filter(event => event.date === selectedDate);
-    setEvents(filteredEvents);
+    setEvents(filteredEvents.sort((a, b) => (a.time || '').localeCompare(b.time || '')));
   };
 
   const confirmDelete = (eventId) => {
@@ -56,26 +66,37 @@ const DayViewScreen = ({ route, navigation }) => {
         <TouchableOpacity 
           style={[styles.swipeButton, styles.editButton]} 
           onPress={() => handleEdit(event)}
+          activeOpacity={0.8}
         >
-          <FontAwesome name="pencil" size={20} color="white" />
+          <MaterialIcons name="edit" size={24} color="white" />
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.swipeButton, styles.deleteButton]} 
           onPress={() => confirmDelete(event.id)}
+          activeOpacity={0.8}
         >
-          <FontAwesome name="trash" size={20} color="white" />
+          <MaterialIcons name="delete" size={24} color="white" />
         </TouchableOpacity>
       </View>
     );
   };
 
   const renderEvent = ({ item }) => (
-    <Swipeable renderRightActions={() => renderRightActions(item)}>
+    <Swipeable
+      renderRightActions={() => renderRightActions(item)}
+      friction={2}
+      rightThreshold={40}
+    >
       <View style={styles.eventItem}>
+        <View style={styles.timeIndicator} />
         <View style={styles.eventContent}>
           <Text style={styles.eventTime}>{item.time || 'All day'}</Text>
           <Text style={styles.eventTitle}>{item.title}</Text>
-          {item.description && <Text style={styles.eventDescription}>{item.description}</Text>}
+          {item.description && (
+            <Text style={styles.eventDescription} numberOfLines={2}>
+              {item.description}
+            </Text>
+          )}
         </View>
       </View>
     </Swipeable>
@@ -83,43 +104,55 @@ const DayViewScreen = ({ route, navigation }) => {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={styles.container}>
-        <Text style={styles.header}>{dayjs(selectedDate).format('dddd, MMMM D, YYYY')}</Text>
-        
-        {events.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No events scheduled for this day</Text>
-            <TouchableOpacity 
-              style={styles.addButton}
-              onPress={() => navigation.navigate('AddEvent', { initialDate: selectedDate })}
-            >
-              <Text style={styles.addButtonText}>Add Event</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <FlatList
-            data={events}
-            renderItem={renderEvent}
-            keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={styles.listContainer}
-          />
-        )}
-      </View>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+      <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top }]}>
+        <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+          <Text style={styles.header}>
+            {dayjs(selectedDate).format('dddd, MMMM D, YYYY')}
+          </Text>
+          
+          {events.length === 0 ? (
+            <View style={styles.emptyState}>
+              <MaterialIcons name="event-available" size={48} color="#d1d5db" />
+              <Text style={styles.emptyText}>No events scheduled</Text>
+              <TouchableOpacity 
+                style={styles.addButton}
+                onPress={() => navigation.navigate('AddEvent', { initialDate: selectedDate })}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="add" size={20} color="white" />
+                <Text style={styles.addButtonText}>Add Event</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <FlatList
+              data={events}
+              renderItem={renderEvent}
+              keyExtractor={(item) => item.id.toString()}
+              contentContainerStyle={styles.listContainer}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </View>
+      </SafeAreaView>
     </GestureHandlerRootView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#fff',
+    paddingHorizontal: 20,
   },
   header: {
-    fontSize: 24,
-    fontWeight: '600',
-    marginBottom: 20,
-    color: '#333',
+    fontSize: 22,
+    fontWeight: '700',
+    marginVertical: 24,
+    color: '#1a1a1a',
     textAlign: 'center',
   },
   listContainer: {
@@ -127,34 +160,40 @@ const styles = StyleSheet.create({
   },
   eventItem: {
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 16,
     marginBottom: 12,
-    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    overflow: 'hidden',
+    flexDirection: 'row',
+  },
+  timeIndicator: {
+    width: 4,
+    backgroundColor: '#4a90e2',
   },
   eventContent: {
-    flexDirection: 'column',
+    flex: 1,
+    padding: 16,
   },
   eventTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 6,
-    color: '#333',
+    fontWeight: '600',
+    marginBottom: 4,
+    color: '#1a1a1a',
   },
   eventTime: {
     fontSize: 14,
-    color: '#777',
-    marginBottom: 6,
+    color: '#4a90e2',
+    marginBottom: 8,
+    fontWeight: '500',
   },
   eventDescription: {
     fontSize: 14,
-    color: '#555',
-    marginTop: 4,
+    color: '#666',
+    lineHeight: 20,
   },
   swipeActions: {
     flexDirection: 'row',
@@ -165,38 +204,42 @@ const styles = StyleSheet.create({
     width: 80,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 12,
   },
   editButton: {
     backgroundColor: '#4a90e2',
   },
   deleteButton: {
-    backgroundColor: '#e74c3c',
-  },
-  swipeButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    backgroundColor: '#ff453a',
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   emptyText: {
-    fontSize: 18,
-    color: '#888',
-    marginBottom: 20,
+    fontSize: 16,
+    color: '#9ca3af',
+    marginVertical: 16,
   },
   addButton: {
     backgroundColor: '#4a90e2',
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 6,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   addButtonText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontWeight: '600',
     fontSize: 16,
+    marginLeft: 8,
   },
 });
 

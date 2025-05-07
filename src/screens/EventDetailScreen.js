@@ -1,76 +1,140 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { loadEvents } from '../utils/storage';  // Assume this function loads stored events
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ActivityIndicator, 
+  TouchableOpacity,
+  SafeAreaView,
+  StatusBar,
+  ScrollView,
+  Alert
+} from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { loadEvents, deleteEvent } from '../utils/storage';
 
 const EventDetailScreen = ({ route, navigation }) => {
-  const { eventId } = route.params;  // Get eventId from params
-  const [event, setEvent] = useState(null);  // Store event details
-  const [loading, setLoading] = useState(true);  // Loading state for async operation
+  const { eventId } = route.params;
+  const [event, setEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch event details using eventId
     const fetchEventDetails = async () => {
       try {
-        const storedEvents = await loadEvents();  // Load events from storage
-        const selectedEvent = storedEvents.find(event => event.id === eventId);  // Find the event by eventId
-        setEvent(selectedEvent);  // Set the event details in state
+        const storedEvents = await loadEvents();
+        const selectedEvent = storedEvents.find(event => event.id === eventId);
+        setEvent(selectedEvent);
       } catch (error) {
         console.error('Error fetching event details:', error);
       } finally {
-        setLoading(false);  // Stop loading after fetching
+        setLoading(false);
       }
     };
 
-    fetchEventDetails();  // Fetch event details on component mount
-  }, [eventId]);  // Re-run when eventId changes
+    fetchEventDetails();
+  }, [eventId]);
+
+  const handleDelete = async () => {
+    Alert.alert(
+      'Delete Event',
+      'Are you sure you want to delete this event?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteEvent(eventId);
+              navigation.goBack();
+            } catch (error) {
+              console.error('Error deleting event:', error);
+            }
+          },
+        },
+      ],
+      { cancelable: false }
+    );
+  };
 
   if (loading) {
     return (
-      <View style={styles.loaderContainer}>
+      <SafeAreaView style={styles.loaderContainer}>
         <ActivityIndicator size="large" color="#4a90e2" />
-      </View>
-    );  // Show loading spinner while fetching
+      </SafeAreaView>
+    );
   }
 
   if (!event) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <Text style={styles.noEventText}>No event found with ID: {eventId}</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.eventCard}>
-        <Text style={styles.header}>Event Details</Text>
-        <Text style={styles.eventName}>{event.title}</Text>
-        <Text style={styles.eventDate}>Date: {event.date}</Text>
-        <Text style={styles.eventTime}>Time: {event.time || 'All day'}</Text>
-        {event.description && <Text style={styles.eventDescription}>Description: {event.description}</Text>}
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor="#f7f7f7" />
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          <View style={styles.container}>
+            <View style={styles.eventCard}>
+              <Text style={styles.header}>Event Details</Text>
+              <Text style={styles.eventName}>{event.title}</Text>
+              <Text style={styles.eventDate}>Date: {event.date}</Text>
+              <Text style={styles.eventTime}>Time: {event.time || 'All day'}</Text>
+              {event.description && (
+                <Text style={styles.eventDescription}>Description: {event.description}</Text>
+              )}
 
-        <TouchableOpacity 
-          style={styles.editButton} 
-          onPress={() => navigation.navigate('EditEvent', { event })} 
-        >
-          <Text style={styles.editButtonText}>Edit Event</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.editButton]} 
+                  onPress={() => navigation.navigate('EditEvent', { event })} 
+                >
+                  <MaterialIcons name="edit" size={20} color="white" />
+                  <Text style={styles.actionButtonText}>Edit</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.deleteButton]} 
+                  onPress={handleDelete}
+                >
+                  <MaterialIcons name="delete" size={20} color="white" />
+                  <Text style={styles.actionButtonText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f7f7f7',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+  },
   container: {
     flex: 1,
-    paddingTop: 40,
-    padding: 16,
-    backgroundColor: '#f7f7f7',
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 20,
   },
   loaderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f7f7f7',
   },
   header: {
     fontSize: 22,
@@ -80,14 +144,13 @@ const styles = StyleSheet.create({
   },
   eventCard: {
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 5,
+    shadowRadius: 8,
     elevation: 4,
-    marginBottom: 20,
   },
   eventName: {
     fontSize: 18,
@@ -109,6 +172,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 10,
+    marginBottom: 20,
+    lineHeight: 20,
   },
   noEventText: {
     fontSize: 16,
@@ -116,17 +181,36 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 50,
   },
-  editButton: {
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginTop: 20,
-    backgroundColor: '#4a90e2',
-    paddingVertical: 12,
-    borderRadius: 6,
-    alignItems: 'center',
   },
-  editButtonText: {
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    width: '48%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  editButton: {
+    backgroundColor: '#4a90e2',
+  },
+  deleteButton: {
+    backgroundColor: '#ff3b30',
+  },
+  actionButtonText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontWeight: '600',
     fontSize: 16,
+    marginLeft: 8,
   },
 });
 
