@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { loadEvents, saveEvent } from '../utils/storage';
 import dayjs from 'dayjs';
-import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler'; // For swipe gestures
+import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import { useNavigation } from '@react-navigation/native';
+import { debounce } from 'lodash';
 
 const MonthlyViewScreen = () => {
   const [events, setEvents] = useState([]);
@@ -11,6 +12,8 @@ const MonthlyViewScreen = () => {
   const [todayEvents, setTodayEvents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredEvents, setFilteredEvents] = useState([]);
+  const [displayedSearchQuery, setDisplayedSearchQuery] = useState('');
+  const [displayedFilteredEvents, setDisplayedFilteredEvents] = useState([]);
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -24,9 +27,26 @@ const MonthlyViewScreen = () => {
     fetchData();
   }, []);
 
+  // Debounced search function
+  const debouncedSearch = useCallback(
+    debounce((query) => {
+      setDisplayedSearchQuery(query);
+      if (query === '') {
+        setDisplayedFilteredEvents([]);
+      } else {
+        const filtered = events.filter(e => 
+          e.title.toLowerCase().includes(query.toLowerCase())
+        );
+        setDisplayedFilteredEvents(filtered);
+      }
+    }, 300),
+    [events]
+  );
+
   useEffect(() => {
-    setFilteredEvents(events.filter(e => e.title.toLowerCase().includes(searchQuery.toLowerCase())));
-  }, [searchQuery, events]);
+    debouncedSearch(searchQuery);
+    return () => debouncedSearch.cancel();
+  }, [searchQuery, debouncedSearch]);
 
   const generateDaysInMonth = () => {
     const start = currentMonth.startOf('month').startOf('week');
@@ -53,7 +73,9 @@ const MonthlyViewScreen = () => {
 
   const renderDay = (day) => {
     const dayString = day.format('YYYY-MM-DD');
-    const dayEvents = filteredEvents.filter(e => e.date === dayString);
+    const dayEvents = displayedSearchQuery ? 
+      displayedFilteredEvents.filter(e => e.date === dayString) : 
+      events.filter(e => e.date === dayString);
 
     return (
       <TouchableOpacity 
@@ -81,8 +103,18 @@ const MonthlyViewScreen = () => {
     </TouchableOpacity>
   );
 
+  const renderSearchResult = ({ item }) => (
+    <TouchableOpacity
+      style={styles.searchItem}
+      onPress={() => navigation.navigate('EventDetail', { eventId: item.id })}
+    >
+      <Text style={styles.searchDate}>{dayjs(item.date).format('MMM D, YYYY')}</Text>
+      <Text style={styles.searchTitle}>{item.title}</Text>
+      <Text style={styles.searchTime}>{item.time}</Text>
+    </TouchableOpacity>
+  );
+
   const handleAddEvent = () => {
-    // Implement logic to add event, like showing a modal or navigating to another screen
     navigation.navigate('AddEvent');
   };
 
@@ -91,8 +123,8 @@ const MonthlyViewScreen = () => {
       <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
         <View style={styles.container}>
           <PanGestureHandler onGestureEvent={({ nativeEvent }) => {
-            if (nativeEvent.translationX < -100) handleSwipe('left');  // Swipe left
-            else if (nativeEvent.translationX > 100) handleSwipe('right');  // Swipe right
+            if (nativeEvent.translationX < -100) handleSwipe('left');
+            else if (nativeEvent.translationX > 100) handleSwipe('right');
           }}>
             <View style={styles.monthHeader}>
               <Text style={styles.monthText}>{currentMonth.format('MMMM YYYY')}</Text>
@@ -109,27 +141,47 @@ const MonthlyViewScreen = () => {
             onChangeText={setSearchQuery}
           />
 
-          <View style={styles.grid}>
-            {days.map((day, index) => (
-              <View key={index} style={styles.dayWrapper}>
-                {renderDay(day)}
+          {displayedSearchQuery ? (
+            <View style={styles.searchResultsContainer}>
+              <Text style={styles.searchResultsTitle}>
+                Search results for "{displayedSearchQuery}"
+              </Text>
+              {displayedFilteredEvents.length > 0 ? (
+                <FlatList
+                  data={displayedFilteredEvents}
+                  renderItem={renderSearchResult}
+                  keyExtractor={(item) => item.id}
+                  style={styles.searchResultsList}
+                />
+              ) : (
+                <Text style={styles.noResultsText}>No events found</Text>
+              )}
+            </View>
+          ) : (
+            <>
+              <View style={styles.grid}>
+                {days.map((day, index) => (
+                  <View key={index} style={styles.dayWrapper}>
+                    {renderDay(day)}
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
 
-          {/* Today's Events Section */}
-          <View style={styles.todaySection}>
-            <Text style={styles.sectionTitle}>Today's Events</Text>
-            {todayEvents.length > 0 ? (
-              <FlatList
-                data={todayEvents}
-                renderItem={renderTodayEvent}
-                keyExtractor={(item) => item.id}
-              />
-            ) : (
-              <Text style={styles.noEventsText}>No events for today</Text>
-            )}
-          </View>
+              {/* Today's Events Section */}
+              <View style={styles.todaySection}>
+                <Text style={styles.sectionTitle}>Today's Events</Text>
+                {todayEvents.length > 0 ? (
+                  <FlatList
+                    data={todayEvents}
+                    renderItem={renderTodayEvent}
+                    keyExtractor={(item) => item.id}
+                  />
+                ) : (
+                  <Text style={styles.noEventsText}>No events for today</Text>
+                )}
+              </View>
+            </>
+          )}
         </View>
       </TouchableWithoutFeedback>
     </GestureHandlerRootView>
@@ -229,6 +281,42 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
     marginTop: 10
+  },
+  searchResultsContainer: {
+    flex: 1,
+    paddingTop: 10
+  },
+  searchResultsTitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 10
+  },
+  searchResultsList: {
+    flex: 1
+  },
+  searchItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee'
+  },
+  searchDate: {
+    fontSize: 12,
+    color: '#999'
+  },
+  searchTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginVertical: 3
+  },
+  searchTime: {
+    fontSize: 14,
+    color: '#666'
+  },
+  noResultsText: {
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 16
   }
 });
 
