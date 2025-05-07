@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, Touchabl
 import { loadEvents } from '../utils/storage';
 import dayjs from 'dayjs';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { debounce } from 'lodash';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -22,16 +22,19 @@ const MonthlyViewScreen = () => {
   const [tempSelectedMonth, setTempSelectedMonth] = useState(dayjs());
   const navigation = useNavigation();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const stored = await loadEvents();
-      setEvents(stored);
-      // Filter today's events
-      const todayString = dayjs().format('YYYY-MM-DD');
-      setTodayEvents(stored.filter(e => e.date === todayString));
-    };
-    fetchData();
-  }, []);
+  // Fetch events whenever screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const fetchData = async () => {
+        const stored = await loadEvents();
+        setEvents(stored);
+        // Filter today's events
+        const todayString = dayjs().format('YYYY-MM-DD');
+        setTodayEvents(stored.filter(e => e.date === todayString));
+      };
+      fetchData();
+    }, [])
+  );
 
   // Debounced search function
   const debouncedSearch = useCallback(
@@ -161,10 +164,7 @@ const MonthlyViewScreen = () => {
                 {months.map((month, index) => (
                   <TouchableOpacity
                     key={month}
-                    style={[
-                      styles.monthYearItem,
-                      tempSelectedMonth.month() === index && styles.selectedMonthYearItem
-                    ]}
+                    style={[styles.monthYearItem, tempSelectedMonth.month() === index && styles.selectedMonthYearItem]}
                     onPress={() => setTempSelectedMonth(tempSelectedMonth.month(index))}
                   >
                     <Text style={tempSelectedMonth.month() === index ? styles.selectedMonthYearText : styles.monthYearText}>
@@ -178,10 +178,7 @@ const MonthlyViewScreen = () => {
                 {years.map(year => (
                   <TouchableOpacity
                     key={year}
-                    style={[
-                      styles.monthYearItem,
-                      tempSelectedMonth.year() === year && styles.selectedMonthYearItem
-                    ]}
+                    style={[styles.monthYearItem, tempSelectedMonth.year() === year && styles.selectedMonthYearItem]}
                     onPress={() => setTempSelectedMonth(tempSelectedMonth.year(year))}
                   >
                     <Text style={tempSelectedMonth.year() === year ? styles.selectedMonthYearText : styles.monthYearText}>
@@ -334,22 +331,21 @@ const MonthlyViewScreen = () => {
                     />
                   ) : (
                     <View style={styles.noEventsContainer}>
-                      <MaterialIcons name="event-available" size={40} color="#ddd" />
-                      <Text style={styles.noEventsText}>No events for today</Text>
+                      <MaterialIcons name="event-available" size={40} color
+                      ="#ccc" />
+                      <Text style={styles.noEventsText}>No events today</Text>
                     </View>
                   )}
                 </View>
               </>
             )}
-
-            {renderMonthYearPicker()}
+          {renderMonthYearPicker()}
           </View>
         </TouchableWithoutFeedback>
       </LinearGradient>
     </GestureHandlerRootView>
   );
 };
-
 const styles = StyleSheet.create({
   container: { 
     flex: 1,
@@ -457,7 +453,7 @@ const styles = StyleSheet.create({
   },
   eventDot: { 
     fontSize: 12, 
-    color: '#2575fc',
+    color: '#6a11cb',
     position: 'absolute',
     bottom: -2,
     fontWeight: 'bold',
