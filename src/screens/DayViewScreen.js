@@ -4,6 +4,7 @@ import { loadEvents, storeEvents } from '../utils/storage';
 import dayjs from 'dayjs';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { FontAwesome } from '@expo/vector-icons'; // Importing FontAwesome icons
 
 const DayViewScreen = ({ route, navigation }) => {
   const { selectedDate } = route.params;
@@ -56,13 +57,13 @@ const DayViewScreen = ({ route, navigation }) => {
           style={[styles.swipeButton, styles.editButton]} 
           onPress={() => handleEdit(event)}
         >
-          <Text style={styles.swipeButtonText}>Edit</Text>
+          <FontAwesome name="pencil" size={20} color="white" />
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.swipeButton, styles.deleteButton]} 
           onPress={() => confirmDelete(event.id)}
         >
-          <Text style={styles.swipeButtonText}>Delete</Text>
+          <FontAwesome name="trash" size={20} color="white" />
         </TouchableOpacity>
       </View>
     );
@@ -99,7 +100,7 @@ const DayViewScreen = ({ route, navigation }) => {
           <FlatList
             data={events}
             renderItem={renderEvent}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.id.toString()}
             contentContainerStyle={styles.listContainer}
           />
         )}
@@ -115,8 +116,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   header: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '600',
     marginBottom: 20,
     color: '#333',
     textAlign: 'center',
@@ -126,31 +127,33 @@ const styles = StyleSheet.create({
   },
   eventItem: {
     backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 10,
-    elevation: 2,
+    borderRadius: 10,
+    marginBottom: 12,
+    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   eventContent: {
-    padding: 16,
+    flexDirection: 'column',
   },
   eventTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 6,
     color: '#333',
   },
   eventTime: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+    color: '#777',
+    marginBottom: 6,
   },
   eventDescription: {
     fontSize: 14,
-    color: '#666',
+    color: '#555',
     marginTop: 4,
   },
   swipeActions: {
@@ -162,6 +165,7 @@ const styles = StyleSheet.create({
     width: 80,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 12,
   },
   editButton: {
     backgroundColor: '#4a90e2',
@@ -179,8 +183,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: 16,
-    color: '#999',
+    fontSize: 18,
+    color: '#888',
     marginBottom: 20,
   },
   addButton: {
@@ -192,6 +196,7 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: 'white',
     fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 
