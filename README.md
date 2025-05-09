@@ -1,7 +1,7 @@
 
 # React Native Calendar App 📅
 
-![App Banner](/UI/Screenshot_20250509_204740.png)
+<img src="/UI/Screenshot_20250509_204740.png" width="30%" alt="Month View">
 
 A feature-rich calendar application built with React Native that helps users manage their events and schedules with an intuitive interface.
 
