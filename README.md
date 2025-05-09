@@ -37,8 +37,8 @@ A feature-rich calendar application built with React Native that helps users man
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/react-native-calendar-app.git
-   cd react-native-calendar-app
+   git clone https://github.com/WICKxDEV/calendar-app.git
+   cd calendar-app
    ```
 
 2. Install dependencies:
